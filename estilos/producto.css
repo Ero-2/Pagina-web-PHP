@@ -1,0 +1,48 @@
+
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header {
+      background-color: #222; color: white; padding: 15px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .logo { font-size: 1.5em; font-weight: bold; }
+    .busqueda input {
+      padding: 5px; width: 300px; border-radius: 5px; border: none;
+    }
+    .acciones button {
+      margin-left: 10px; padding: 7px 15px; border: none;
+      border-radius: 5px; background-color: #444; color: white; cursor: pointer;
+    }
+    main {
+      padding: 20px; display: flex; flex-direction: column; align-items: center;
+    }
+    .producto-detalle {
+      max-width: 800px; width: 100%; display: flex;
+      gap: 30px; margin-bottom: 40px;
+    }
+    .producto-detalle img {
+      width: 350px; height: 350px; object-fit: cover; border-radius: 10px;
+    }
+    .info-producto {
+      flex: 1;
+    }
+    .info-producto h2 { margin-top: 0; }
+    .info-producto p { margin: 10px 0; }
+    .info-producto button {
+      padding: 10px 20px; font-size: 16px; background-color: green;
+      color: white; border: none; border-radius: 5px; cursor: pointer;
+    }
+    .comentarios {
+      max-width: 800px; width: 100%;
+    }
+    .comentarios h3 { margin-bottom: 10px; }
+    .comentario {
+      border-top: 1px solid #ddd; padding: 10px 0;
+    }
+    form textarea {
+      width: 100%; height: 80px; margin-bottom: 10px;
+    }
+    form input[type="submit"] {
+      padding: 8px 16px; background-color: #333; color: white;
+      border: none; border-radius: 5px;
+    }
+  

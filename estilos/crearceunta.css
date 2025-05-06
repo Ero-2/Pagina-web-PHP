@@ -1,0 +1,74 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f3f4f6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f9fafb;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.register-container {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    width: 400px;
+    text-align: center;
+}
+
+.register-container h2 {
+    margin-bottom: 20px;
+    color: #111827;
+}
+
+.register-container input,
+.register-container select {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 16px;
+}
+
+.register-container button {
+    width: 100%;
+    padding: 12px;
+    background-color: #10b981;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.register-container button:hover {
+    background-color: #059669;
+}
+
+.register-container .login-link {
+    margin-top: 15px;
+    display: inline-block;
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.register-container .login-link:hover {
+    text-decoration: underline;
+}
