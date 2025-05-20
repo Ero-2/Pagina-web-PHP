@@ -11,7 +11,7 @@ $id_tipo = $_POST['id_tipo_de_usuario'];
 $fecha = date("Y-m-d H:i:s");
 
 // que no exista el correo
-$check = $conn->prepare("SELECT * FROM Usuario WHERE correo = ?");
+$check = $conn->prepare("SELECT * FROM usuario WHERE correo = ?");
 $check->bind_param("s", $correo);
 $check->execute();
 $result = $check->get_result();
@@ -31,3 +31,5 @@ if ($stmt->execute()) {
 } else {
   echo "Error al registrar usuario.";
 }
+
+

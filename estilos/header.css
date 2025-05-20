@@ -1,0 +1,77 @@
+/* Estilo general del header */
+.header {
+  background: linear-gradient(135deg, #007bff 0%, #00c8ff 100%);
+  color: white;
+  padding: 1rem 2rem;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.acciones {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-action {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-action i {
+  margin-right: 5px;
+}
+
+.btn-action:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+#filterButton {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 25px;
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#filterButton i {
+  font-size: 12px;
+}
+
+/* Media Queries para responsividad */
+@media (max-width: 768px) {
+  .header .container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .acciones {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

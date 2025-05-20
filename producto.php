@@ -13,7 +13,7 @@ $resultado = $conn->query($sql);
 $producto = $resultado->fetch_assoc();
 
 if (!$producto) {
-  die("Producto no encontrado");
+    die("Producto no encontrado");
 }
 ?>
 <!DOCTYPE html>
@@ -22,23 +22,43 @@ if (!$producto) {
   <meta charset="UTF-8">
   <title><?= htmlspecialchars($producto['nombre_Producto']) ?> | Mi E-Commerce</title>
   <link rel="stylesheet" href="estilos/producto.css">
+  <link rel="stylesheet" href="estilos/carrito.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css ">
+  <style>
+    .sin-stock {
+      color: red;
+      font-weight: bold;
+    }
+    .boton-editar {
+      background-color: #2575fc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">🛍️ Mi E-Commerce</div>
-  <div class="acciones"><button onclick="location.href='inicio.php'">Inicio</button></div> 
-  <form action="buscar.php" method="get" class="busqueda">
-    <input type="text" name="q" placeholder="Buscar productos..." required>
-    <button type="submit">🔍</button>
+<header class="header">
+  <div class="logo"><i class="fas fa-shopping-bag"></i> Mi E-Commerce</div>
+
+  <form action="buscar.php" method="get" class="busqueda" style="flex-grow: 1; margin: 0 1rem;">
+    <input type="text" name="q" placeholder="Buscar productos..." required style="padding: 8px; width: 100%; border-radius: 25px; border: none;">
+    <button type="submit" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #2575fc;"><i class="fas fa-search"></i></button>
   </form>
+
   <div class="acciones">
-    <button onclick="location.href='carrito.php'">🛒 Carrito</button>
+    <button onclick="location.href='inicio.php'"><i class="fas fa-home"></i> Inicio</button>
+    <button onclick="location.href='carrito.php'"><i class="fas fa-shopping-cart"></i> Carrito</button>
+
     <?php if (isset($_SESSION['nombre_usuario'])): ?>
-      <span>👤 <?= htmlspecialchars($_SESSION['nombre_usuario']) ?></span>
-      <button onclick="location.href='logout.php'">Cerrar sesión</button>
+      <button><i class="fas fa-user"></i> <?= htmlspecialchars($_SESSION['nombre_usuario']) ?></button>
+      <button onclick="location.href='logout.php'"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</button>
     <?php else: ?>
-      <button onclick="location.href='login.php'">Iniciar sesión</button>
+      <button onclick="location.href='login.php'"><i class="fas fa-sign-in-alt"></i> Iniciar sesión</button>
     <?php endif; ?>
   </div>
 </header>
@@ -49,12 +69,36 @@ if (!$producto) {
     <div class="info-producto">
       <h2><?= htmlspecialchars($producto['nombre_Producto']) ?></h2>
       <p><strong>Precio:</strong> $<?= number_format($producto['Precio'], 2) ?></p>
+      <p><strong>Stock:</strong> <?= intval($producto['stock']) ?></p>
+
+      <?php if ($producto['stock'] == 0): ?>
+        <p class="sin-stock">Producto agotado</p>
+      <?php endif; ?>
+
       <p><strong>Descripción:</strong><br><?= nl2br(htmlspecialchars($producto['descripcion'])) ?></p>
 
+      <?php if ($producto['stock'] > 0): ?>
+        <?php if (isset($_SESSION['id_usuario'])): ?>
+          <button onclick="agregarAlCarrito(<?= $producto['id_Producto'] ?>)">Agregar al carrito</button>
+        <?php else: ?>
+          <p><a href="login.php">Inicia sesión para agregar al carrito</a></p>
+        <?php endif; ?>
+      <?php endif; ?>
+
+      <!-- BOTÓN EDITAR PRODUCTO -->
       <?php if (isset($_SESSION['id_usuario'])): ?>
-        <button onclick="agregarAlCarrito(<?= $producto['id_Producto'] ?>)">Agregar al carrito</button>
-      <?php else: ?>
-        <p><a href="login.php">Inicia sesión para agregar al carrito</a></p>
+        <?php
+        // Verificar si el usuario es administrador o vendedor
+        $id_usuario = $_SESSION['id_usuario'];
+        $tipo_usuario_sql = "SELECT id_tipo_de_usuario FROM usuario WHERE id_Usuario = $id_usuario";
+        $result_tipo = $conn->query($tipo_usuario_sql);
+        $tipo_usuario = $result_tipo->fetch_assoc();
+
+        // Tipos permitidos: por ejemplo, 1 = admin, 2 = vendedor
+        $tipos_permitidos = [1, 2]; // Cambia según tus IDs reales
+        if (in_array($tipo_usuario['id_tipo_de_usuario'], $tipos_permitidos)): ?>
+          <a href="editar_producto.php?id=<?= $producto['id_Producto'] ?>" class="boton-editar">Editar Producto</a>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
   </div>

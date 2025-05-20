@@ -1,0 +1,95 @@
+/* Estilo general del contenido */
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f9f9f9;
+}
+
+/* Títulos de secciones */
+h1, h2, h3 {
+  color: #333;
+  border-bottom: 2px solid #ccc;
+  padding-bottom: 5px;
+  margin-bottom: 20px;
+}
+
+/* Formularios */
+form {
+  margin-bottom: 40px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+form label,
+form input,
+form select,
+form textarea {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+form input[type="text"],
+form input[type="email"],
+form select,
+form textarea {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+form button {
+  padding: 10px 20px;
+  background-color: #0275d8;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
+
+form button:hover {
+  background-color: #025aa5;
+}
+
+/* Separador entre secciones */
+hr {
+  margin: 40px 0;
+  border: none;
+  border-top: 1px solid #ccc;
+}
+
+/* Botón de volver */
+a {
+  color: #0275d8;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Inputs pequeños para dirección */
+select,
+input[type="number"] {
+  width: auto;
+  min-width: 150px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  main {
+    padding: 20px;
+  }
+
+  form label,
+  form input,
+  form select,
+  form textarea {
+    font-size: 12px;
+  }
+}
