@@ -1,66 +1,83 @@
 <?php
 require_once '../config/db.php';
-require_once '../config/jwt.php'; // el archivo que mostraste
+require_once '../vendor/autoload.php';
 
-header('Content-Type: application/json');
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+header("Content-Type: application/json");
+
+// Validar token
+$headers = getallheaders();
+$authHeader = $headers['Authorization'] ?? '';
+if (!str_starts_with($authHeader, 'Bearer ')) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Token no proporcionado']);
+    exit;
+}
+$token = str_replace('Bearer ', '', $authHeader);
+try {
+    $decoded = JWT::decode($token, new Key('erick123', 'HS256'));
+    $id_usuario = $decoded->data->id_usuario;
+} catch (Exception $e) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Token inválido']);
     exit;
 }
 
-$headers = getallheaders();
-$token = isset($headers[JWT_HEADER_NAME]) ? str_replace('Bearer ', '', $headers[JWT_HEADER_NAME]) : '';
+// Obtener el carrito
+$stmt = $conn->prepare("SELECT id_Carrito FROM Carrito WHERE id_Usuario = ?");
+$stmt->bind_param("i", $id_usuario);
+$stmt->execute();
+$result = $stmt->get_result();
 
-try {
-    $decoded = decode_jwt($token);
-    $id_usuario = $decoded->id_usuario ?? null;
-
-    if (!$id_usuario) {
-        throw new Exception('ID de usuario no encontrado en el token');
-    }
-
-    // Obtener productos del carrito
-    $stmt = $conn->prepare("SELECT cp.id_Producto, cp.cantidad, p.Precio
-                            FROM Carrito_Producto cp
-                            JOIN Carrito c ON cp.id_Carrito = c.id_Carrito
-                            JOIN Producto p ON p.id_Producto = cp.id_Producto
-                            WHERE c.id_Usuario = ?");
-    $stmt->bind_param("i", $id_usuario);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows === 0) {
-        echo json_encode(['success' => false, 'message' => 'El carrito está vacío']);
-        exit;
-    }
-
-    // Crear pedido
-    $conn->begin_transaction();
-    $conn->query("INSERT INTO Pedido (id_Usuario, fecha_Pedido) VALUES ($id_usuario, NOW())");
-    $id_pedido = $conn->insert_id;
-
-    $stmt_detalle = $conn->prepare("INSERT INTO Detalle_Pedido (id_Pedido, id_Producto, cantidad, subtotal) VALUES (?, ?, ?, ?)");
-
-    while ($row = $result->fetch_assoc()) {
-        $subtotal = $row['Precio'] * $row['cantidad'];
-        $stmt_detalle->bind_param("iiid", $id_pedido, $row['id_Producto'], $row['cantidad'], $subtotal);
-        $stmt_detalle->execute();
-    }
-
-    // Vaciar el carrito
-    $stmt_clear = $conn->prepare("DELETE cp FROM Carrito_Producto cp
-                                  JOIN Carrito c ON cp.id_Carrito = c.id_Carrito
-                                  WHERE c.id_Usuario = ?");
-    $stmt_clear->bind_param("i", $id_usuario);
-    $stmt_clear->execute();
-
-    $conn->commit();
-
-    echo json_encode(['success' => true, 'message' => 'Compra finalizada correctamente']);
-} catch (Exception $e) {
-    $conn->rollback();
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+if ($result->num_rows === 0) {
+    echo json_encode(['success' => false, 'message' => 'Carrito no encontrado']);
+    exit;
 }
+
+$id_carrito = $result->fetch_assoc()['id_Carrito'];
+
+// Obtener productos del carrito
+$stmt = $conn->prepare("SELECT cp.id_Producto, cp.cantidad, p.Precio FROM Carrito_Producto cp
+                        JOIN Producto p ON cp.id_Producto = p.id_Producto
+                        WHERE cp.id_Carrito = ?");
+$stmt->bind_param("i", $id_carrito);
+$stmt->execute();
+$productos = $stmt->get_result();
+
+if ($productos->num_rows === 0) {
+    echo json_encode(['success' => false, 'message' => 'Carrito vacío']);
+    exit;
+}
+
+$total = 0;
+$items = [];
+while ($row = $productos->fetch_assoc()) {
+    $subtotal = $row['Precio'] * $row['cantidad'];
+    $total += $subtotal;
+    $items[] = [
+        'id_Producto' => $row['id_Producto'],
+        'cantidad' => $row['cantidad'],
+        'precio_unitario' => $row['Precio'],
+        'subtotal' => $subtotal
+    ];
+}
+
+// Crear pedido
+$stmt = $conn->prepare("INSERT INTO Pedido (id_Usuario, fecha_Pedido, estado_pedido, total) VALUES (?, NOW(), 'Procesando', ?)");
+$stmt->bind_param("id", $id_usuario, $total);
+$stmt->execute();
+$id_pedido = $conn->insert_id;
+
+// Insertar en detalle_pedido
+$stmt = $conn->prepare("INSERT INTO Detalle_Pedido (id_Pedido, id_Producto, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)");
+foreach ($items as $item) {
+    $stmt->bind_param("iiidd", $id_pedido, $item['id_Producto'], $item['cantidad'], $item['precio_unitario'], $item['subtotal']);
+    $stmt->execute();
+}
+
+// Limpiar el carrito
+$conn->prepare("DELETE FROM Carrito_Producto WHERE id_Carrito = ?")->bind_param("i", $id_carrito)->execute();
+
+echo json_encode(['success' => true, 'message' => 'Compra realizada con éxito']);

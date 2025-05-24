@@ -27,134 +27,142 @@ if (!isset($_SESSION['token'])) {
 <main class="main-content">
   <section class="carrito-section">
     <h2>Tu Carrito</h2>
-    <div id="carrito-container"></div>
-    <div class="total-carrito" id="total-container"></div>
+    <div id="carrito-items" class="carrito-items"></div>
+    <div class="total-carrito" id="carrito-total"></div>
   </section>
 
-  <section class="historial-compras">
-    <h2>Tus Compras Realizadas</h2>
-    <div id="historial-compras-container"></div>
+  <section class="historial-compras-section">
+    <h2>Historial de Compras</h2>
+    <div id="historial-compras"></div>
   </section>
 </main>
 
 <script>
-const token = localStorage.getItem('token');
+const token = "<?= $_SESSION['token'] ?>";
+
+async function cargarCarrito() {
+  const res = await fetch('api/carrito.php', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const data = await res.json();
+
+  const contenedor = document.getElementById('carrito-items');
+  const totalContainer = document.getElementById('carrito-total');
+  contenedor.innerHTML = '';
+  totalContainer.innerHTML = '';
+
+  if (!data.success || data.carrito.length === 0) {
+    contenedor.innerHTML = `<div class="carrito-vacio">
+      <i class="fas fa-shopping-cart fa-4x"></i>
+      <p>Tu carrito está vacío. <a href="inicio.php">Volver a comprar</a></p>
+    </div>`;
+    return;
+  }
+
+  let total = 0;
+  data.carrito.forEach(p => {
+    const subtotal = p.Precio * p.cantidad;
+    total += subtotal;
+
+    contenedor.innerHTML += `
+      <div class="carrito-card">
+        <img src="${p.url || 'img/placeholder.jpg'}" alt="${p.nombre_Producto}" class="carrito-img">
+        <div class="carrito-info">
+          <div>
+            <p class="product-name">${p.nombre_Producto}</p>
+            <p>Precio: $${p.Precio.toFixed(2)}</p>
+            <p>Cantidad: ${p.cantidad}</p>
+            <p><strong>Total: $${subtotal.toFixed(2)}</strong></p>
+          </div>
+          <button class="btn-eliminar" onclick="eliminarDelCarrito(${p.id_Producto})">
+            <i class="fas fa-trash-alt"></i> Eliminar
+          </button>
+        </div>
+      </div>`;
+  });
+
+  totalContainer.innerHTML = `
+    <strong>Total: $${total.toFixed(2)}</strong>
+    <button id="btn-comprar" onclick="finalizarCompra()">
+      <i class="fas fa-check-circle"></i> Finalizar Compra
+    </button>`;
+}
+
+async function eliminarDelCarrito(idProducto) {
+  const res = await fetch('api/carrito.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ accion: 'eliminar', id_producto: idProducto })
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert('Producto eliminado');
+    cargarCarrito();
+  } else {
+    alert('Error al eliminar el producto.');
+  }
+}
+
+async function finalizarCompra() {
+  const res = await fetch('api/comprar.php', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert('Compra realizada con éxito');
+    location.href = 'gracias.php';
+  } else {
+    alert('Error al procesar compra: ' + data.message);
+  }
+}
+
+async function cargarHistorialCompras() {
+  const res = await fetch("api/compras.php", {
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  });
+  const data = await res.json();
+
+  const container = document.getElementById("historial-compras");
+  container.innerHTML = '';
+
+  if (!data.success || !data.compras || data.compras.length === 0) {
+    container.innerHTML = "<p>No tienes compras anteriores.</p>";
+    return;
+  }
+
+  data.compras.forEach(pedido => {
+    // Ajusta según cómo envíe tu API la fecha y el estado
+    const fecha = new Date(pedido.fecha_Pedido || pedido.fecha).toLocaleString();
+    const estado = pedido.estado_pedido || pedido.estado || 'Desconocido';
+
+    let html = `
+      <div class="card border p-3 mb-3">
+        <h4>Pedido del ${fecha}</h4>
+        <p><strong>Estado:</strong> ${estado}</p>
+        <ul>`;
+
+    // Asegúrate que tu API envía un array con los productos del pedido
+    (pedido.productos || []).forEach(p => {
+      html += `<li>${p.nombre_Producto || p.nombre} — ${p.cantidad} × $${p.precio_unitario || p.Precio} = $${p.subtotal.toFixed(2)}</li>`;
+    });
+
+    html += `</ul>
+        <p><strong>Total del pedido:</strong> $${pedido.total.toFixed(2)}</p>
+      </div>
+    `;
+
+    container.innerHTML += html;
+  });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   cargarCarrito();
-  cargarHistorial();
+  cargarHistorialCompras();  // <== Ejecutamos la carga del historial al inicio
 });
-
-function cargarCarrito() {
-  fetch('api/carrito.php', {
-    method: 'GET',
-    headers: {
-      'Authorization': 'Bearer ' + token
-    }
-  })
-  .then(res => res.json())
-  .then(data => {
-    const container = document.getElementById('carrito-container');
-    const totalContainer = document.getElementById('total-container');
-
-    if (data.success && data.productos.length > 0) {
-      let total = 0;
-      data.productos.forEach(p => {
-        total += p.Precio * p.cantidad;
-        container.innerHTML += `
-          <div class="carrito-card">
-            <img src="${p.url || 'img/placeholder.jpg'}" class="carrito-img">
-            <div class="carrito-info">
-              <p class="product-name">${p.nombre_Producto}</p>
-              <p>Precio: $${p.Precio.toFixed(2)}</p>
-              <p>Cantidad: ${p.cantidad}</p>
-              <p><strong>Total: $${(p.Precio * p.cantidad).toFixed(2)}</strong></p>
-              <button class="btn-eliminar" onclick="eliminarDelCarrito(${p.id_Producto})">
-                <i class="fas fa-trash-alt"></i> Eliminar
-              </button>
-            </div>
-          </div>
-        `;
-      });
-      totalContainer.innerHTML = `
-        <strong>Total: $${total.toFixed(2)}</strong>
-        <button onclick="finalizarCompra()"><i class="fas fa-check-circle"></i> Finalizar Compra</button>
-      `;
-    } else {
-      container.innerHTML = `
-        <div class="carrito-vacio">
-          <i class="fas fa-shopping-cart fa-4x"></i>
-          <p>Tu carrito está vacío. <a href="inicio.php">Volver a comprar</a></p>
-        </div>`;
-    }
-  });
-}
-
-function cargarHistorial() {
-  fetch('api/compras.php', {
-    method: 'GET',
-    headers: {
-      'Authorization': 'Bearer ' + token
-    }
-  })
-  .then(res => res.json())
-  .then(data => {
-    const container = document.getElementById('historial-compras-container');
-
-    if (data.success && data.compras.length > 0) {
-      data.compras.forEach(compra => {
-        container.innerHTML += `
-          <div class="compra-card">
-            <p class="product-name">${compra.nombre_Producto}</p>
-            <p>Cantidad: ${compra.cantidad}</p>
-            <p>Precio: $${compra.Precio.toFixed(2)}</p>
-            <p>Subtotal: $${compra.subtotal.toFixed(2)}</p>
-            <p>Fecha: ${compra.fecha_Pedido}</p>
-          </div>
-        `;
-      });
-    } else {
-      container.innerHTML = `
-        <div class="no-compras">
-          <i class="fas fa-shopping-bag fa-3x"></i>
-          <p>No tienes compras realizadas.</p>
-        </div>`;
-    }
-  });
-}
-
-function eliminarDelCarrito(idProducto) {
-  fetch('api/carrito.php', {
-    method: 'DELETE',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ id_producto: idProducto })
-  })
-  .then(res => res.json())
-  .then(data => {
-    alert(data.message);
-    if (data.success) location.reload();
-  });
-}
-
-function finalizarCompra() {
-  fetch('api/comprar.php', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    }
-  })
-  .then(res => res.json())
-  .then(data => {
-    alert(data.message);
-    if (data.success) location.href = "gracias.php";
-  });
-}
 </script>
 
 </body>
 </html>
-
