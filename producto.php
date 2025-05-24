@@ -85,17 +85,14 @@ if (!$producto) {
         <?php endif; ?>
       <?php endif; ?>
 
-      <!-- BOTÓN EDITAR PRODUCTO -->
       <?php if (isset($_SESSION['id_usuario'])): ?>
         <?php
-        // Verificar si el usuario es administrador o vendedor
         $id_usuario = $_SESSION['id_usuario'];
         $tipo_usuario_sql = "SELECT id_tipo_de_usuario FROM usuario WHERE id_Usuario = $id_usuario";
         $result_tipo = $conn->query($tipo_usuario_sql);
         $tipo_usuario = $result_tipo->fetch_assoc();
 
-        // Tipos permitidos: por ejemplo, 1 = admin, 2 = vendedor
-        $tipos_permitidos = [1, 2]; // Cambia según tus IDs reales
+        $tipos_permitidos = [1, 2];
         if (in_array($tipo_usuario['id_tipo_de_usuario'], $tipos_permitidos)): ?>
           <a href="editar_producto.php?id=<?= $producto['id_Producto'] ?>" class="boton-editar">Editar Producto</a>
         <?php endif; ?>
@@ -149,26 +146,38 @@ if (!$producto) {
 
 <script>
 function agregarAlCarrito(idProducto) {
-    const idUsuario = <?= $_SESSION['id_usuario'] ?? 0 ?>;
+    const jwtToken = "<?= $_SESSION['token'] ?? '' ?>";
 
-    if (idUsuario === 0) {
-        alert("Debes iniciar sesión para agregar productos al carrito.");
+    if (!jwtToken) {
+        alert("Debes iniciar sesión primero.");
+        window.location.href = "login.php";
         return;
     }
 
     fetch('api/carrito.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + jwtToken
+        },
         body: JSON.stringify({
             accion: 'agregar',
-            id_usuario: idUsuario,
             id_producto: idProducto,
             cantidad: 1
         })
     })
     .then(res => res.json())
     .then(data => {
-        alert(data.message);
+        if (data.success) {
+            alert("Producto agregado al carrito");
+            location.reload();
+        } else {
+            alert("Error: " + data.message);
+        }
+    })
+    .catch(err => {
+        console.error("Error:", err);
+        alert("Hubo un problema al conectar con el servidor.");
     });
 }
 </script>

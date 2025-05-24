@@ -1,0 +1,14 @@
+{
+    "name": "eroer/proyecto2",
+    "description": "api simple con jwt",
+    "authors": [
+        {
+            "name": "Ero-2",
+            "email": "erickbmxstreetmva@gmail.com"
+        }
+    ],
+    "require": {
+        "kreait/firebase-php": "^5.26",
+        "firebase/php-jwt": "^6.11"
+    }
+}

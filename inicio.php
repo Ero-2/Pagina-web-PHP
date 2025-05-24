@@ -1,7 +1,4 @@
-<?php
-session_start();
-?>
-
+<?php session_start(); ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -14,7 +11,6 @@ session_start();
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css ">
   <link href="https://fonts.googleapis.com/css2?family=Poppins :wght@300;400;600&display=swap" rel="stylesheet">
 </head>
-
 <body>
 
 <!-- HEADER -->
@@ -40,7 +36,6 @@ session_start();
     <div class="filter-menu">
       <button id="filterButton"><i class="fas fa-filter"></i> Filtrar</button>
       <div id="categoryMenu" style="display: none;">
-        <!-- Las categorías se cargarán dinámicamente desde JS o PHP -->
         <a href="#" class="category-item" data-id="">Todas</a>
         <a href="#" class="category-item" data-id="1">Tecnología</a>
         <a href="#" class="category-item" data-id="2">Ropa</a>
@@ -109,6 +104,13 @@ session_start();
 
 <!-- SCRIPTS -->
 <script>
+// Pasar PHP -> JS
+const token = '<?= $_SESSION['token'] ?? '' ?>';
+const idUsuario = <?= $_SESSION['id_usuario'] ?? 'null' ?>;
+const tipoUsuario = <?= $_SESSION['id_tipo_de_usuario'] ?? 'null' ?>;
+</script>
+
+<script>
 // Menú de categorías
 document.getElementById('filterButton').addEventListener('click', function() {
   const categoryMenu = document.getElementById('categoryMenu');
@@ -125,9 +127,15 @@ document.querySelectorAll('.category-item').forEach(item => {
 });
 
 function fetchProductosPorCategoria(categoria_id) {
-  const token = 'Bearer 12345ABCD';
+  // Validar que haya token antes de hacer la solicitud
+  if (!token) {
+    console.warn("No hay token. Redirigiendo a login...");
+    alert("Debes iniciar sesión para ver los productos.");
+    window.location.href = "login.php";
+    return;
+  }
 
-  let url = 'api/productos.php';
+  let url = 'api/producto.php';
   if (categoria_id) {
     url += `?categoria_id=${categoria_id}`;
   }
@@ -135,19 +143,21 @@ function fetchProductosPorCategoria(categoria_id) {
   fetch(url, {
     method: 'GET',
     headers: {
-      'Authorization': token,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     }
   })
   .then(response => {
-    if (!response.ok) throw new Error('Error en la API');
+    if (!response.ok) {
+      throw new Error('Error al obtener los datos de la API');
+    }
     return response.json();
   })
   .then(productos => {
     const container = document.getElementById('productos-container');
     container.innerHTML = '';
 
-    if (productos.length === 0) {
+    if (!Array.isArray(productos) || productos.length === 0) {
       container.innerHTML = '<p>No hay productos disponibles.</p>';
       return;
     }
@@ -165,7 +175,7 @@ function fetchProductosPorCategoria(categoria_id) {
     });
   })
   .catch(err => {
-    console.error('Error:', err);
+    console.error('Error:', err.message);
     document.getElementById('productos-container').innerHTML = `
       <p>Error al cargar productos. Inténtalo más tarde.</p>`;
   });
@@ -197,7 +207,7 @@ function cambiarBanner(direccion) {
 
 document.addEventListener('DOMContentLoaded', () => {
   mostrarBanner(index);
-  fetchProductosPorCategoria(); // Cargar todos los productos al iniciar
+  fetchProductosPorCategoria(); // Cargar todos los productos al inicio
 });
 </script>
 
