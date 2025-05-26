@@ -2,48 +2,62 @@
 require_once '../config/db.php';
 require_once '../config/auth.php';
 
-verificar_token(); // Verifica si el token es válido
-
 header("Content-Type: application/json");
 
-// Obtener ID del producto desde la URL
-$id_producto = isset($_GET['id']) ? intval($_GET['id']) : null;
+switch ($_SERVER['REQUEST_METHOD']) {
+    case 'GET':
+        $id_producto = isset($_GET['id']) ? intval($_GET['id']) : null;
 
-if ($id_producto !== null && $id_producto > 0) {
-    // Consulta para obtener un producto específico
-    $sql = "SELECT p.id_Producto, p.nombre_Producto, p.Precio, p.stock, p.descripcion, i.url 
-            FROM Producto p 
-            LEFT JOIN Imagen i ON p.id_Producto = i.id_Producto 
-            WHERE p.id_Producto = ?
-            GROUP BY p.id_Producto";
+        if ($id_producto && $id_producto > 0) {
+            // Obtener un producto específico
+            $sql = "SELECT p.id_Producto, p.nombre_Producto, p.Precio, p.stock, p.descripcion, i.url 
+                    FROM Producto p 
+                    LEFT JOIN Imagen i ON p.id_Producto = i.id_Producto 
+                    WHERE p.id_Producto = ?
+                    GROUP BY p.id_Producto";
 
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $id_producto);
-    $stmt->execute();
-    $result = $stmt->get_result();
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $id_producto);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
-    if ($row = $result->fetch_assoc()) {
-        echo json_encode($row);
-    } else {
-        echo json_encode(["error" => "Producto no encontrado"]);
-    }
-} else {
-    // No se pasó ID, devolver todos los productos
-    $sql = "SELECT p.id_Producto, p.nombre_Producto, p.Precio, p.stock, p.descripcion, i.url 
-            FROM Producto p 
-            LEFT JOIN Imagen i ON p.id_Producto = i.id_Producto 
-            GROUP BY p.id_Producto";
+            if ($row = $result->fetch_assoc()) {
+                echo json_encode(['success' => true, 'producto' => $row]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Producto no encontrado']);
+            }
+        } else {
+            // Listar todos los productos
+            $sql = "SELECT p.id_Producto, p.nombre_Producto, p.Precio, p.stock, p.descripcion, i.url 
+                    FROM Producto p 
+                    LEFT JOIN Imagen i ON p.id_Producto = i.id_Producto 
+                    GROUP BY p.id_Producto";
 
-    $result = $conn->query($sql);
+            $result = $conn->query($sql);
 
-    if ($result->num_rows > 0) {
-        $productos = [];
-        while ($row = $result->fetch_assoc()) {
-            $productos[] = $row;
+            if ($result && $result->num_rows > 0) {
+                $productos = [];
+                while ($row = $result->fetch_assoc()) {
+                    $productos[] = $row;
+                }
+                echo json_encode(['success' => true, 'productos' => $productos]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'No hay productos disponibles']);
+            }
         }
-        echo json_encode($productos);
-    } else {
-        echo json_encode(["error" => "No hay productos disponibles"]);
-    }
+        break;
+
+    case 'POST':
+    case 'PUT':
+    case 'DELETE':
+        verificar_token(); // Solo aquí se exige el token
+        echo json_encode(['success' => false, 'message' => 'Funcionalidad no implementada aún']);
+        break;
+
+    default:
+        http_response_code(405);
+        echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+        break;
 }
 ?>
+
