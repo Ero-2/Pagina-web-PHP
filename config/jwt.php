@@ -1,5 +1,8 @@
 <?php
 
+use \Firebase\JWT\JWT;
+use \Firebase\JWT\Key;
+
 /**
  * Configuración y funciones básicas para JWT (JSON Web Tokens)
  */
@@ -11,22 +14,27 @@ define('JWT_SECRET_KEY', 'erick123');
 define('JWT_ALGORITHM', 'HS256');
 
 // Tiempo de expiración del token (en segundos)
-define('JWT_EXPIRE_TIME', 3600); // 1 hora
+define('JWT_EXPIRE_TIME', 86400); // 24 horas
 
 // Nombre del encabezado donde se espera el token
 define('JWT_HEADER_NAME', 'Authorization');
 
-
-use \Firebase\JWT\JWT;
-use \Firebase\JWT\Key;
-
 /**
  * Genera un nuevo token JWT para un usuario
  *
- * @param array $payload Datos a incluir en el token (ej: ['id_usuario' => 123])
+ * @param array $data Datos del usuario a incluir (ej: ['id_usuario' => 123])
  * @return string Token codificado
  */
-function generate_jwt($payload) {
+function generate_jwt($data) {
+    $issuedAt = time();
+    $expire = $issuedAt + JWT_EXPIRE_TIME;
+
+    $payload = [
+        'iat'  => $issuedAt,
+        'exp'  => $expire,
+        'data' => $data
+    ];
+
     return JWT::encode($payload, JWT_SECRET_KEY, JWT_ALGORITHM);
 }
 
@@ -38,14 +46,17 @@ function generate_jwt($payload) {
  * @throws Exception Si el token es inválido o está expirado
  */
 function decode_jwt($token) {
+    if (empty($token)) {
+        throw new Exception("Token vacío o no proporcionado", 401);
+    }
+
     try {
-        $decoded = JWT::decode($token, new Key(JWT_SECRET_KEY, JWT_ALGORITHM));
-        return $decoded;
-    } catch (\Firebase\JWT\SignatureInvalidException $e) {
-        throw new Exception("Firma del token inválida");
+        return JWT::decode($token, new Key(JWT_SECRET_KEY, JWT_ALGORITHM));
     } catch (\Firebase\JWT\ExpiredException $e) {
-        throw new Exception("Token expirado");
+        throw new Exception("Token expirado", 401);
+    } catch (\Firebase\JWT\SignatureInvalidException $e) {
+        throw new Exception("Firma del token inválida", 401);
     } catch (Exception $e) {
-        throw new Exception("Token inválido: " . $e->getMessage());
+        throw new Exception("Token inválido: " . $e->getMessage(), 401);
     }
 }
