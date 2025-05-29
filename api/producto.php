@@ -1,25 +1,60 @@
 <?php
-require_once '../config/db.php';
-require_once '../config/auth.php'; // Contiene verificar_token()
 
-header("Content-Type: application/json");
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
-// Solo requerir token si NO es un método GET (ej: POST, PUT, DELETE)
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/jwt.php';
+
+header("Content-Type: application/json; charset=utf-8");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+// Solo verificar token si no es una solicitud GET sin ID (listar todos)
 $requiere_auth = false;
-
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     $requiere_auth = true;
 }
 
 if ($requiere_auth) {
-    verificar_token(); // Esta función valida el token JWT
+    // Obtener el token desde el header Authorization
+    $headers = getallheaders();
+    if (!isset($headers['Authorization'])) {
+        http_response_code(401);
+        echo json_encode(["error" => "Token no proporcionado"]);
+        exit;
+    }
+
+    $authHeader = $headers['Authorization'];
+    if (strpos($authHeader, 'Bearer ') !== 0) {
+        http_response_code(401);
+        echo json_encode(["error" => "Formato de token inválido"]);
+        exit;
+    }
+
+    $token = trim(str_replace('Bearer ', '', $authHeader));
+
+    try {
+        $key = "tu_clave_secreta"; // Debe coincidir con la usada para firmar los tokens
+        $decoded = JWT::decode($token, new Key($key, 'HS256'));
+    } catch (Exception $e) {
+        http_response_code(401);
+        echo json_encode(["error" => "Token inválido", "detalle" => $e->getMessage()]);
+        exit;
+    }
 }
 
-// Obtener ID del producto desde la URL
 $id_producto = isset($_GET['id']) ? intval($_GET['id']) : null;
 
-// Si hay un ID válido, devolver un producto específico
 if ($id_producto !== null && $id_producto > 0) {
+    // Devolver un producto específico
     $sql = "SELECT p.id_Producto, p.nombre_Producto, p.Precio, p.stock, p.descripcion, i.url 
             FROM Producto p 
             LEFT JOIN Imagen i ON p.id_Producto = i.id_Producto 
@@ -28,9 +63,10 @@ if ($id_producto !== null && $id_producto > 0) {
             LIMIT 1";
 
     $stmt = $conn->prepare($sql);
-    
+
     if (!$stmt) {
-        echo json_encode(["error" => "Error en la consulta: " . $conn->error]);
+        http_response_code(500);
+        echo json_encode(["error" => "Error en la consulta SQL: " . $conn->error]);
         exit;
     }
 
@@ -41,10 +77,12 @@ if ($id_producto !== null && $id_producto > 0) {
     if ($row = $result->fetch_assoc()) {
         echo json_encode($row);
     } else {
+        http_response_code(404);
         echo json_encode(["error" => "Producto no encontrado"]);
     }
+
 } else {
-    // No se pasó ID o es inválido → devolver todos los productos
+    // Devolver todos los productos
     $sql = "SELECT p.id_Producto, p.nombre_Producto, p.Precio, p.stock, p.descripcion, i.url 
             FROM Producto p 
             LEFT JOIN Imagen i ON p.id_Producto = i.id_Producto 
@@ -53,7 +91,8 @@ if ($id_producto !== null && $id_producto > 0) {
     $result = $conn->query($sql);
 
     if (!$result) {
-        echo json_encode(["error" => "Error en la consulta: " . $conn->error]);
+        http_response_code(500);
+        echo json_encode(["error" => "Error en la consulta SQL: " . $conn->error]);
         exit;
     }
 

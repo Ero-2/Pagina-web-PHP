@@ -1,167 +1,237 @@
 <?php
 session_start();
-require_once 'config/db.php';
-
-// Verificar si el usuario está logueado y tiene permiso
-if (!isset($_SESSION['id_usuario']) || ($_SESSION['id_tipo_de_usuario'] != 1 && $_SESSION['id_tipo_de_usuario'] != 2)) {
-    header("Location: inicio.php");
-    exit();
-}
-
-// Obtener ID del producto desde GET
 $id_producto = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$jwt_token = $_SESSION['token'] ?? '';
 
-// Consultar producto con su categoría asociada
-$sql = "SELECT p.*, c.nombre AS categoria_nombre 
-        FROM producto p 
-        LEFT JOIN categoria c ON p.id_categoria = c.id_categoria 
-        WHERE p.id_Producto = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $id_producto);
-$stmt->execute();
-$result = $stmt->get_result();
-$producto = $result->fetch_assoc();
-
-if (!$producto) {
-    die("Producto no encontrado.");
-}
-
-// Consultar todas las categorías para mostrarlas en el formulario
-$categorias_stmt = $conn->query("SELECT id_categoria, nombre FROM categoria ORDER BY nombre");
-
-// Si se envió el formulario
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre = $conn->real_escape_string($_POST['nombre']);
-    $precio = floatval($_POST['precio']);
-    $descripcion = $conn->real_escape_string($_POST['descripcion']);
-    $stock = intval($_POST['stock']);
-    $id_categoria = intval($_POST['id_categoria']);
-
-    // Validación básica
-    if (empty($nombre) || $precio <= 0 || $stock < 0 || !$id_categoria) {
-        header("Location: editar_producto.php?id=$id_producto&error=1");
-        exit;
-    }
-
-    // Actualizar producto
-    $update_sql = "UPDATE producto SET 
-        nombre_Producto = ?, 
-        Precio = ?, 
-        descripcion = ?, 
-        stock = ?, 
-        id_categoria = ?
-        WHERE id_Producto = ?";
-    $update_stmt = $conn->prepare($update_sql);
-
-    // Aquí usamos "d" para double (float)
-    $update_stmt->bind_param(
-        "sdsiii",
-        $nombre,      // s: string
-        $precio,      // d: double
-        $descripcion, // s: string
-        $stock,       // i: int
-        $id_categoria,// i: int
-        $id_producto  // i: int
-    );
-
-    if ($update_stmt->execute()) {
-        // Manejar carga de nueva imagen si se proporciona
-        if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
-            $upload_dir = "uploads/";
-            $imagen_nombre = basename($_FILES['imagen']['name']);
-            $imagen_ruta = $upload_dir . uniqid() . "-" . $imagen_nombre;
-
-            if (move_uploaded_file($_FILES['imagen']['tmp_name'], $imagen_ruta)) {
-                // Eliminar imagen anterior si existe
-                $imagen_anterior_sql = "SELECT url FROM imagen WHERE id_Producto = ?";
-                $img_stmt = $conn->prepare($imagen_anterior_sql);
-                $img_stmt->bind_param("i", $id_producto);
-                $img_stmt->execute();
-                $img_result = $img_stmt->get_result();
-                while ($img = $img_result->fetch_assoc()) {
-                    if (file_exists($img['url'])) unlink($img['url']);
-                }
-
-                // Actualizar o insertar nueva imagen
-                $sql_imagen = "INSERT INTO imagen (id_Producto, url, tipo) VALUES (?, ?, ?)
-                               ON DUPLICATE KEY UPDATE url = VALUES(url)";
-                $stmt_imagen = $conn->prepare($sql_imagen);
-                $tipo = mime_content_type($_FILES['imagen']['tmp_name']);
-                $stmt_imagen->bind_param("iss", $id_producto, $imagen_ruta, $tipo);
-                $stmt_imagen->execute();
-                $stmt_imagen->close();
-            } else {
-                echo "<div class='mensaje-error'>Error al subir la imagen.</div>";
-            }
-        }
-
-        header("Location: editar_producto.php?id=$id_producto&success=1");
-        exit;
-    } else {
-        header("Location: editar_producto.php?id=$id_producto&error=1");
-        exit;
-    }
-}
+// Verificar si el usuario es administrador (1) o vendedor (2)
+$esAdminOVendedor = isset($_SESSION['id_tipo_de_usuario']) && in_array($_SESSION['id_tipo_de_usuario'], [1, 2]);
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Editar Producto | Mi E-Commerce</title>
-  <link rel="stylesheet" href="estilos/editar_producto.css">
-  <style>
-    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
-    .formulario-editar { background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; }
-    button { margin-top: 15px; padding: 10px 20px; background: #2575fc; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    .mensaje-exito { color: green; background: #d4edda; padding: 10px; border-radius: 5px; }
-    .mensaje-error { color: red; background: #f8d7da; padding: 10px; border-radius: 5px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Editar Producto | Mi E-Commerce</title>
+    <link rel="stylesheet" href="estilos/editar_producto.css">
+    <link rel="stylesheet" href="estilos/carrito.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css ">
+    <style>
+        .sin-stock {
+            color: red;
+            font-weight: bold;
+        }
+        .boton-editar {
+            background-color: #2575fc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        .boton-editar:hover {
+            background-color: #1a58c3;
+        }
+        .formulario-editar {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-top: 30px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2575fc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .mensaje-exito, .mensaje-error {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .mensaje-exito {
+            background-color: #d4edda;
+            color: green;
+        }
+        .mensaje-error {
+            background-color: #f8d7da;
+            color: red;
+        }
+    </style>
 </head>
 <body>
 
-<div class="formulario-editar">
-  <h2>Editar Producto</h2>
+<header class="header">
+    <div class="logo"><i class="fas fa-shopping-bag"></i> Mi E-Commerce</div>
+    <form action="buscar.php" method="get" class="busqueda" style="flex-grow: 1; margin: 0 1rem;">
+        <input type="text" name="q" placeholder="Buscar productos..." required style="padding: 8px; width: 100%; border-radius: 25px; border: none;">
+        <button type="submit" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #2575fc;">
+            <i class="fas fa-search"></i>
+        </button>
+    </form>
+    <div class="acciones">
+        <button onclick="location.href='inicio.php'"><i class="fas fa-home"></i> Inicio</button>
+        <button onclick="location.href='carrito.php'"><i class="fas fa-shopping-cart"></i> Carrito</button>
+        <?php if (isset($_SESSION['nombre_usuario'])): ?>
+            <button><i class="fas fa-user"></i> <?= htmlspecialchars($_SESSION['nombre_usuario']) ?></button>
+            <?php if ($esAdminOVendedor): ?>
+                <button class="boton-editar" onclick="location.href='editar_producto.php?id=<?= $id_producto ?>'">
+                    <i class="fas fa-edit"></i> Editar Producto
+                </button>
+            <?php endif; ?>
+            <button onclick="location.href='logout.php'"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</button>
+        <?php else: ?>
+            <button onclick="location.href='login.php'"><i class="fas fa-sign-in-alt"></i> Iniciar sesión</button>
+        <?php endif; ?>
+    </div>
+</header>
 
-  <?php if (isset($_GET['error'])): ?>
-    <div class="mensaje-error">Hubo un error al actualizar el producto.</div>
-  <?php endif; ?>
+<main>
+    <div class="formulario-editar" id="formulario-editar">
+        <h2>Editar Producto</h2>
 
-  <?php if (isset($_GET['success'])): ?>
-    <div class="mensaje-exito">Producto actualizado correctamente.</div>
-  <?php endif; ?>
+        <!-- Mostrar mensajes de éxito/error -->
+        <div id="mensaje" style="display: none;" class="mensaje-error"></div>
 
-  <form method="post" enctype="multipart/form-data">
-    <label for="nombre">Nombre del Producto:</label>
-    <input type="text" name="nombre" id="nombre" value="<?= htmlspecialchars($producto['nombre_Producto']) ?>" required>
+        <!-- Formulario estático -->
+        <form id="editarForm" enctype="multipart/form-data" method="post">
+            <label for="nombre">Nombre del Producto:</label>
+            <input type="text" name="nombre" id="nombre" required>
 
-    <label for="precio">Precio:</label>
-    <input type="number" step="0.01" name="precio" id="precio" value="<?= $producto['Precio'] ?>" required>
+            <label for="precio">Precio:</label>
+            <input type="number" step="0.01" name="precio" id="precio" required>
 
-    <label for="descripcion">Descripción:</label>
-    <textarea name="descripcion" id="descripcion" rows="4"><?= htmlspecialchars($producto['descripcion']) ?></textarea>
+            <label for="descripcion">Descripción:</label>
+            <textarea name="descripcion" id="descripcion" rows="4"></textarea>
 
-    <label for="stock">Stock:</label>
-    <input type="number" name="stock" id="stock" value="<?= $producto['stock'] ?>" min="0" required>
+            <label for="stock">Stock:</label>
+            <input type="number" name="stock" id="stock" min="0" required>
 
-    <label for="id_categoria">Categoría:</label>
-    <select name="id_categoria" id="id_categoria" required>
-      <option value="">-- Selecciona una categoría --</option>
-      <?php while ($categoria = $categorias_stmt->fetch_assoc()): ?>
-        <option value="<?= $categoria['id_categoria'] ?>" <?= $producto['id_categoria'] == $categoria['id_categoria'] ? 'selected' : '' ?>>
-          <?= htmlspecialchars($categoria['nombre']) ?>
-        </option>
-      <?php endwhile; ?>
-    </select>
+            <label for="id_categoria">Categoría:</label>
+            <select name="id_categoria" id="id_categoria" required></select>
 
-    <label for="imagen">Cambiar Imagen:</label>
-    <input type="file" name="imagen" id="imagen" accept="image/*">
+            <label for="imagen">Cambiar Imagen:</label>
+            <img src="" alt="Imagen actual" id="imagenActual" style="max-width: 200px; margin-bottom: 10px;" />
+            <input type="file" name="imagen" id="imagen" accept="image/*">
 
-    <button type="submit">Guardar Cambios</button>
-  </form>
-</div>
+            <button type="submit">Guardar Cambios</button>
+        </form>
+    </div>
+</main>
 
+<script>
+const productoId = <?= $id_producto ?>;
+const jwtToken = "<?= $jwt_token ?>";
+const esAdminOVendedor = <?= $esAdminOVendedor ? 'true' : 'false' ?>;
+
+function showMessage(text, isError = false) {
+    const mensajeDiv = document.getElementById('mensaje');
+    mensajeDiv.style.display = 'block';
+    mensajeDiv.textContent = text;
+    mensajeDiv.className = `mensaje-${isError ? 'error' : 'exito'}`;
+}
+
+async function cargarProducto() {
+    try {
+        const res = await fetch(`api/productos.php?id=${productoId}`);
+        const data = await res.json();
+
+        if (!data.success || !data.producto) {
+            throw new Error("Producto no encontrado");
+        }
+
+        const p = data.producto;
+
+        // Rellenar campos del formulario
+        document.getElementById('nombre').value = p.nombre_Producto;
+        document.getElementById('precio').value = parseFloat(p.Precio).toFixed(2);
+        document.getElementById('descripcion').value = p.descripcion;
+        document.getElementById('stock').value = parseInt(p.stock);
+
+        // Cargar categorías dinámicamente
+        const catRes = await fetch('api/categorias.php');
+        const catData = await catRes.json();
+        const categoriaSelect = document.getElementById('id_categoria');
+
+        if (catData.success && Array.isArray(catData.categorias)) {
+            catData.categorias.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id_categoria;
+                option.textContent = cat.nombre;
+                if (cat.id_categoria === p.id_categoria) {
+                    option.selected = true;
+                }
+                categoriaSelect.appendChild(option);
+            });
+        } else {
+            showMessage("No se pudieron cargar las categorías", true);
+        }
+
+        // Mostrar imagen actual
+        const imgElement = document.getElementById('imagenActual');
+        if (p.url) {
+            imgElement.src = p.url;
+            imgElement.style.display = 'block';
+        }
+
+    } catch (err) {
+        console.error("Error al cargar producto:", err);
+        showMessage("Error al cargar los datos del producto", true);
+    }
+}
+
+document.getElementById('editarForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    if (!esAdminOVendedor) {
+        alert("No tienes permisos para editar este producto.");
+        return;
+    }
+
+    const form = new FormData(document.getElementById('editarForm'));
+
+    try {
+        const response = await fetch(`api/editar_producto.php?id=${productoId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${jwtToken}`
+            },
+            body: form
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showMessage("Producto actualizado correctamente.", false);
+        } else {
+            showMessage(result.error || "Error desconocido", true);
+        }
+
+    } catch (err) {
+        console.error("Error al actualizar el producto:", err);
+        showMessage("Error al conectar con el servidor: " + err.message, true);
+    }
+});
+
+cargarProducto();
+</script>
 </body>
 </html>
